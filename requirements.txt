@@ -1,0 +1,74 @@
+# AuditIQ PoC — Requirements
+# ============================================================
+# This project is a Node.js application (not Python).
+# Dependencies are managed via npm (package.json).
+# This file documents system prerequisites and key packages.
+# ============================================================
+
+
+## SYSTEM PREREQUISITES
+# ---------------------------------------------------------------
+# Node.js   >= 18.x   (https://nodejs.org)
+# npm       >= 9.x    (bundled with Node.js)
+# OS        Windows / macOS / Linux
+
+
+## ENVIRONMENT VARIABLES
+# ---------------------------------------------------------------
+# Copy .env.example to .env and configure as needed.
+#
+# Required (none — app runs fully without any env vars in PoC mode)
+#
+# Optional — enable live email sending via Gmail:
+#   GMAIL_USER=your-gmail-address@gmail.com
+#   GMAIL_APP_PASSWORD=your-app-password
+#
+# If GMAIL_USER / GMAIL_APP_PASSWORD are not set, email sending
+# is stubbed — queries are logged to the server console only.
+
+
+## FRONTEND PACKAGES  (installed via: npm install)
+# ---------------------------------------------------------------
+react@19                      # UI framework
+react-dom@19                  # DOM renderer
+vite@6                        # Build tool & dev server (port 3000)
+typescript@5.8                # Static typing
+tailwindcss@4                 # Utility-first CSS
+@tailwindcss/vite@4           # Tailwind Vite plugin
+lucide-react@0.546            # Icon library
+motion@12                     # Animation (Framer Motion)
+chart.js@4                    # Chart rendering engine
+react-chartjs-2@5             # React wrapper for Chart.js
+@google/genai@1               # Google Generative AI SDK (future use)
+
+
+## BACKEND PACKAGES  (installed via: npm install in root)
+# ---------------------------------------------------------------
+express@4                     # HTTP server (port 3001)
+better-sqlite3@12             # Embedded SQLite database (sync API)
+multer@2                      # Multipart file upload handling
+xlsx@0.18                     # Excel file parsing (SheetJS)
+nodemailer@8                  # Email sending (SMTP / Gmail)
+dotenv@17                     # Environment variable loading
+cors@2                        # Cross-origin request headers
+
+
+## QUICK START
+# ---------------------------------------------------------------
+# Terminal 1 — Backend:
+#   node server/index.js
+#
+# Terminal 2 — Frontend:
+#   npm run dev
+#
+# Then open: http://localhost:3000
+
+
+## ACCEPTED EXCEL INPUT FORMAT
+# ---------------------------------------------------------------
+# File type:  .xlsx
+# Sheet name: "Source" or "Sheet1" (case-insensitive)
+# Required columns (column header names must match exactly):
+#   Row Serial, Invoice No, Cost Office, Vendor, VVD,
+#   Yard Code, CSR No, ATB Date, Depot Type, Contract Rate,
+#   Currency, Cost Code, Calc Remark, Manual Value, Issue Date

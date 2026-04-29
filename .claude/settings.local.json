@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/c/Users/vignesh.rajakuma/node/npm install *)",
+      "Bash(/c/Users/vignesh.rajakuma/node/npm run *)",
+      "PowerShell($env:PATH; [System.Environment]::GetEnvironmentVariable\\(\"PATH\", \"Machine\"\\) -split \";\" | Where-Object { $_ -match \"node\" })",
+      "PowerShell([System.Environment]::GetEnvironmentVariable\\(\"PATH\",\"User\"\\) -split \";\" | ForEach-Object { $_.Trim\\(\\) } | Where-Object { $_ -ne \"\" })"
+    ]
+  }
+}

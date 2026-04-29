@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+}
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans;
+  }
+}
+
+@layer components {
+  .btn-amber {
+    @apply bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .badge {
+    @apply px-2.5 py-0.5 rounded-full text-xs font-semibold;
+  }
+  
+  .badge-cleared { @apply bg-green-100 text-green-700; }
+  .badge-query { @apply bg-red-100 text-red-700; }
+  .badge-pending { @apply bg-gray-100 text-gray-600; }
+  .badge-review { @apply bg-amber-100 text-amber-700; }
+
+  /* Toggle Switch */
+  .toggle-switch {
+    @apply relative inline-block w-10 h-5;
+  }
+  .toggle-switch input {
+    @apply opacity-0 w-0 h-0;
+  }
+  .toggle-slider {
+    @apply absolute cursor-pointer top-0 left-0 right-0 bottom-0 bg-slate-300 transition-all duration-300 rounded-full;
+  }
+  .toggle-slider:before {
+    @apply absolute content-[''] h-4 w-4 left-0.5 bottom-0.5 bg-white transition-all duration-300 rounded-full;
+  }
+  input:checked + .toggle-slider {
+    @apply bg-green-500;
+  }
+  input:checked + .toggle-slider:before {
+    @apply translate-x-5;
+  }
+
+  /* Inline Input */
+  .inline-input {
+    @apply bg-white border border-slate-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 w-20;
+  }
+}
