@@ -59,6 +59,8 @@ import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { Doughnut, Bar } from 'react-chartjs-2';
 import { Invoice, Screen, ApiInvoice, ApiInvoiceDetail, ApiCheck, ApiStats, ApiAlertsResponse, ApiAlertCard, ApiComment } from './types';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 ChartJS.register(
   ArcElement,
   Tooltip,
@@ -461,8 +463,8 @@ function InvoiceQueue({ onSelectInvoice }: { onSelectInvoice: (serial: string) =
       if (costOffice) params.append('costOffice', costOffice);
       if (search) params.append('search', search);
       const [invRes, statsRes] = await Promise.all([
-        fetch(`/api/invoices?${params}`),
-        fetch('/api/stats'),
+        fetch(`${API_BASE}/api/invoices?${params}`),
+        fetch(`${API_BASE}/api/stats`),
       ]);
       const invData = await invRes.json();
       const statsData = await statsRes.json();
@@ -496,7 +498,7 @@ function InvoiceQueue({ onSelectInvoice }: { onSelectInvoice: (serial: string) =
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const res = await fetch('/api/audit/status');
+        const res = await fetch(`${API_BASE}/api/audit/status`);
         const prog = await res.json();
         if (prog.status === 'running') {
           setUploadPhase('auditing');
@@ -527,7 +529,7 @@ function InvoiceQueue({ onSelectInvoice }: { onSelectInvoice: (serial: string) =
     const form = new FormData();
     form.append('file', file);
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: form });
+      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
       const data = await res.json();
       if (data.error) {
         setUploadPhase('idle');
@@ -886,7 +888,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
 
   const fetchDetail = useCallback(async () => {
     try {
-      const res = await fetch(`/api/invoices/${rowSerial}`);
+      const res = await fetch(`${API_BASE}/api/invoices/${rowSerial}`);
       const data: ApiInvoiceDetail = await res.json();
       setDetail(data);
     } catch {
@@ -901,7 +903,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
   const fetchComments = useCallback(async (checkNumber: number) => {
     setCommentsLoading(true);
     try {
-      const res = await fetch(`/api/comments?rowSerial=${rowSerial}&checkNumber=${checkNumber}`);
+      const res = await fetch(`${API_BASE}/api/comments?rowSerial=${rowSerial}&checkNumber=${checkNumber}`);
       setComments(await res.json());
     } catch {
       setComments([]);
@@ -928,7 +930,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
     if (!detail || !selectedCheck) return;
     setActionLoading(true);
     try {
-      await fetch('/api/email/send', {
+      await fetch(`${API_BASE}/api/email/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -952,7 +954,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
     if (!detail || !selectedCheck || !resolutionType) return;
     setActionLoading(true);
     try {
-      await fetch('/api/resolve', {
+      await fetch(`${API_BASE}/api/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -974,7 +976,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
   const handleUndo = async (resolutionId: number) => {
     setActionLoading(true);
     try {
-      await fetch('/api/resolve/undo', {
+      await fetch(`${API_BASE}/api/resolve/undo`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resolutionId }),
@@ -989,7 +991,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
     if (!commentCheckNum || !commentText.trim()) return;
     setCommentSubmitting(true);
     try {
-      await fetch('/api/comments', {
+      await fetch(`${API_BASE}/api/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rowSerial, checkNumber: commentCheckNum, commentText: commentText.trim() }),
@@ -2239,7 +2241,7 @@ function AIProviderSection() {
   const [info, setInfo] = useState<{ provider: string; model: string | null; configured: boolean } | null>(null);
 
   useEffect(() => {
-    fetch('/api/config/ai-provider')
+    fetch(`${API_BASE}/api/config/ai-provider`)
       .then(r => r.json())
       .then(setInfo)
       .catch(() => setInfo({ provider: 'none', model: null, configured: false }));
@@ -2859,8 +2861,8 @@ function AlertsEscalation({ onNavigateToCase }: { onNavigateToCase: (rowSerial: 
     setLoading(true);
     try {
       const [ar, er] = await Promise.all([
-        fetch('/api/alerts?tab=alerts').then(r => r.json()),
-        fetch('/api/alerts?tab=escalations').then(r => r.json()),
+        fetch(`${API_BASE}/api/alerts?tab=alerts`).then(r => r.json()),
+        fetch(`${API_BASE}/api/alerts?tab=escalations`).then(r => r.json()),
       ]);
       setAlertsData(ar);
       setEscalationsData(er);
