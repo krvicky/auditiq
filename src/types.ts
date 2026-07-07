@@ -78,6 +78,15 @@ export interface ApiResolution {
   resolved_at: string;
 }
 
+export interface ApiComment {
+  id: number;
+  row_serial: string;
+  check_number: number;
+  comment_text: string;
+  commented_by: string;
+  commented_at: string;
+}
+
 export interface ApiInvoiceDetail extends ApiInvoice {
   depot_type: string | null;
   calc_remark: string | null;

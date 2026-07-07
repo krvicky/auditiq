@@ -8,6 +8,7 @@ db.pragma('foreign_keys = ON');
 
 // Drop then recreate on every start — ensures schema is always current, data always fresh
 db.exec(`
+  DROP TABLE IF EXISTS comments;
   DROP TABLE IF EXISTS resolutions;
   DROP TABLE IF EXISTS audit_results;
   DROP TABLE IF EXISTS invoice_rows;
@@ -63,6 +64,15 @@ db.exec(`
     original_status TEXT,
     resolved_by     TEXT DEFAULT 'Audit Team',
     resolved_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE comments (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    row_serial   TEXT NOT NULL,
+    check_number INTEGER NOT NULL,
+    comment_text TEXT NOT NULL,
+    commented_by TEXT NOT NULL DEFAULT 'Audit Team',
+    commented_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 `);
 

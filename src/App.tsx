@@ -55,8 +55,9 @@ import {
   BarElement,
   Title,
 } from 'chart.js';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { Invoice, Screen, ApiInvoice, ApiInvoiceDetail, ApiStats, ApiAlertsResponse, ApiAlertCard } from './types';
+import { Invoice, Screen, ApiInvoice, ApiInvoiceDetail, ApiCheck, ApiStats, ApiAlertsResponse, ApiAlertCard, ApiComment } from './types';
 
 ChartJS.register(
   ArcElement,
@@ -65,7 +66,8 @@ ChartJS.register(
   CategoryScale,
   LinearScale,
   BarElement,
-  Title
+  Title,
+  ChartDataLabels
 );
 
 const INVOICES: Invoice[] = [
@@ -337,7 +339,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="font-bold text-lg leading-tight">AuditIQ</h1>
-            <p className="text-xs text-slate-400">Pacific Lines</p>
+            <p className="text-xs text-slate-400">Shipping Lines</p>
           </div>
         </div>
 
@@ -392,7 +394,7 @@ export default function App() {
           </div>
           <div className="overflow-hidden">
             <p className="text-sm font-medium truncate">Audit Team — India</p>
-            <p className="text-[10px] text-slate-400 truncate">vignesh.rajakuma@pacificlines.com</p>
+            <p className="text-[10px] text-slate-400 truncate">vignesh.rajakuma@shippinglines.com</p>
           </div>
         </div>
       </aside>
@@ -872,10 +874,15 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
   const [selectedCheckNum, setSelectedCheckNum] = useState<number | null>(null);
   const [resolutionType, setResolutionType] = useState('');
   const [resolutionNotes, setResolutionNotes] = useState('');
-  const [emailTo, setEmailTo] = useState('vendor.ops@pacificlines.com');
-  const [emailCc, setEmailCc] = useState('audit.india@pacificlines.com');
+  const [emailTo, setEmailTo] = useState('vendor.ops@shippinglines.com');
+  const [emailCc, setEmailCc] = useState('audit.india@shippinglines.com');
   const [emailBody, setEmailBody] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [comments, setComments] = useState<ApiComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [commentCheckNum, setCommentCheckNum] = useState<number | null>(null);
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
 
   const fetchDetail = useCallback(async () => {
     try {
@@ -890,6 +897,23 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
   }, [rowSerial]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
+
+  const fetchComments = useCallback(async (checkNumber: number) => {
+    setCommentsLoading(true);
+    try {
+      const res = await fetch(`/api/comments?rowSerial=${rowSerial}&checkNumber=${checkNumber}`);
+      setComments(await res.json());
+    } catch {
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, [rowSerial]);
+
+  useEffect(() => {
+    if (commentCheckNum !== null) fetchComments(commentCheckNum);
+    else { setComments([]); setCommentText(''); }
+  }, [commentCheckNum, fetchComments]);
 
   const selectedCheck = detail?.checks.find(c => c.check_number === selectedCheckNum) ?? null;
 
@@ -958,6 +982,22 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
       await fetchDetail();
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleSubmitComment = async () => {
+    if (!commentCheckNum || !commentText.trim()) return;
+    setCommentSubmitting(true);
+    try {
+      await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rowSerial, checkNumber: commentCheckNum, commentText: commentText.trim() }),
+      });
+      setCommentText('');
+      await Promise.all([fetchComments(commentCheckNum), fetchDetail()]);
+    } finally {
+      setCommentSubmitting(false);
     }
   };
 
@@ -1125,6 +1165,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                       {isManuallyResolved && (
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] font-bold text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-100">✅ Manually Resolved</span>
+                          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">{resolution!.resolution_type}</span>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleUndo(resolution!.id); }}
                             disabled={actionLoading}
@@ -1168,6 +1209,19 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
             </div>
           </div>
 
+          {/* Comments Section */}
+          <CommentsSection
+            checks={detail.checks}
+            comments={comments}
+            commentsLoading={commentsLoading}
+            selectedCheckNum={commentCheckNum}
+            onSelectCheck={setCommentCheckNum}
+            commentText={commentText}
+            onCommentChange={setCommentText}
+            onSubmit={handleSubmitComment}
+            submitting={commentSubmitting}
+          />
+
           {/* Audit Trail Log */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Audit Trail Log</h4>
@@ -1200,6 +1254,22 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                   );
                 }
 
+                if (r.resolution_type === 'comment') {
+                  const checkForComment = detail.checks.find((c: ApiCheck) => c.check_number === r.check_number);
+                  return (
+                    <div key={r.id} className="flex items-start gap-4 relative z-10">
+                      <div className="p-1 rounded-full bg-slate-50 text-slate-400"><MessageSquare size={16} /></div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">
+                          Comment added — {checkForComment?.check_name || `Check #${r.check_number}`}
+                        </p>
+                        {r.resolution_note && <p className="text-xs text-slate-500 mt-0.5 italic">&ldquo;{r.resolution_note}&rdquo;</p>}
+                        <p className="text-[10px] text-slate-400 mt-1">{r.resolved_by} · {new Date(r.resolved_at).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  );
+                }
+
                 const iconClass = isEmail ? 'bg-blue-50 text-blue-500' : 'bg-green-50 text-green-500';
                 const icon = isEmail ? <Mail size={16} /> : <CheckCircle2 size={16} />;
                 const label = isEmail ? 'Query Email Sent' : `Check Manually Resolved — ${r.resolution_type}`;
@@ -1224,6 +1294,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
               />
             </div>
           </div>
+
         </div>
       </div>
 
@@ -1327,13 +1398,15 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                   )}
                   {detail.resolutions.filter(r => r.check_number === selectedCheckNum).map(r => (
                     <div key={r.id} className="flex items-start gap-4 relative z-10">
-                      <div className={`w-4 h-4 rounded-full border-4 border-white shadow-sm ${r.resolution_type === 'email_sent' ? 'bg-blue-500' : r.resolution_type === 'undone' ? 'bg-amber-400' : 'bg-green-500'}`}></div>
+                      <div className={`w-4 h-4 rounded-full border-4 border-white shadow-sm ${r.resolution_type === 'email_sent' ? 'bg-blue-500' : r.resolution_type === 'undone' ? 'bg-amber-400' : r.resolution_type === 'comment' ? 'bg-slate-400' : 'bg-green-500'}`}></div>
                       <div>
                         <p className="text-xs text-slate-900">
                           {r.resolution_type === 'email_sent'
                             ? 'Query email sent'
                             : r.resolution_type === 'undone'
                             ? `Resolution undone — reverted to ${r.original_status || 'previous status'}`
+                            : r.resolution_type === 'comment'
+                            ? 'Comment added'
                             : `Manually resolved — ${r.resolution_type}`}
                         </p>
                         <p className="text-[10px] text-slate-400">{new Date(r.resolved_at).toLocaleString()}</p>
@@ -1392,13 +1465,20 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Resolution Type</label>
                         <select value={resolutionType} onChange={(e) => setResolutionType(e.target.value)} className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none">
                           <option value="">Select resolution...</option>
-                          <option value="Data Entry Error">Data Entry Error</option>
-                          <option value="Approved Exception">Approved Exception</option>
-                          <option value="Duplicate Entry">Duplicate Entry</option>
-                          <option value="Other">Other</option>
+                          <option value="Rate billed without HQ approval">Rate billed without HQ approval</option>
+                          <option value="Wrong rate filing in LMS">Wrong rate filing in LMS</option>
+                          <option value="LMS Limitation">LMS Limitation</option>
+                          <option value="Special HQ Approval">Special HQ Approval</option>
+                          <option value="Reporting error / Data entry error">Reporting error / Data entry error</option>
+                          <option value="Reporting Knowledge Gap">Reporting Knowledge Gap</option>
+                          <option value="Vendor Wrong Billing">Vendor Wrong Billing</option>
+                          <option value="Agreement / Rate not registered in LMS">Agreement / Rate not registered in LMS</option>
+                          <option value="Agreement / Rate expired in LMS">Agreement / Rate expired in LMS</option>
+                          <option value="LMS could not auto calculate / LMS bug">LMS could not auto calculate / LMS bug</option>
+                          <option value="Others">Others</option>
                         </select>
                       </div>
-                      {resolutionType === 'Other' && (
+                      {resolutionType === 'Others' && (
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
                           <textarea value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} placeholder="Enter additional notes..." className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none min-h-[60px]" />
@@ -1411,7 +1491,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                       </div>
                       <button
                         onClick={handleMarkAsPassed}
-                        disabled={!resolutionType || actionLoading}
+                        disabled={!resolutionType || (resolutionType === 'Others' && !resolutionNotes.trim()) || actionLoading}
                         className="w-full bg-navy-900 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Mark This Check as Passed
@@ -1457,13 +1537,20 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                         <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Resolution Type</label>
                         <select value={resolutionType} onChange={(e) => setResolutionType(e.target.value)} className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none">
                           <option value="">Select resolution...</option>
-                          <option value="Data Entry Error">Data Entry Error</option>
-                          <option value="Approved Exception">Approved Exception</option>
-                          <option value="Duplicate Entry">Duplicate Entry</option>
-                          <option value="Other">Other</option>
+                          <option value="Rate billed without HQ approval">Rate billed without HQ approval</option>
+                          <option value="Wrong rate filing in LMS">Wrong rate filing in LMS</option>
+                          <option value="LMS Limitation">LMS Limitation</option>
+                          <option value="Special HQ Approval">Special HQ Approval</option>
+                          <option value="Reporting error / Data entry error">Reporting error / Data entry error</option>
+                          <option value="Reporting Knowledge Gap">Reporting Knowledge Gap</option>
+                          <option value="Vendor Wrong Billing">Vendor Wrong Billing</option>
+                          <option value="Agreement / Rate not registered in LMS">Agreement / Rate not registered in LMS</option>
+                          <option value="Agreement / Rate expired in LMS">Agreement / Rate expired in LMS</option>
+                          <option value="LMS could not auto calculate / LMS bug">LMS could not auto calculate / LMS bug</option>
+                          <option value="Others">Others</option>
                         </select>
                       </div>
-                      {resolutionType === 'Other' && (
+                      {resolutionType === 'Others' && (
                         <div>
                           <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Notes</label>
                           <textarea value={resolutionNotes} onChange={(e) => setResolutionNotes(e.target.value)} placeholder="Enter additional notes..." className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none min-h-[60px]" />
@@ -1476,7 +1563,7 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
                       </div>
                       <button
                         onClick={handleMarkAsPassed}
-                        disabled={!resolutionType || actionLoading}
+                        disabled={!resolutionType || (resolutionType === 'Others' && !resolutionNotes.trim()) || actionLoading}
                         className="w-full bg-navy-900 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-navy-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Mark This Check as Passed
@@ -1489,6 +1576,76 @@ function CaseView({ rowSerial, onBack }: { rowSerial: string, onBack: () => void
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function CommentsSection({ checks, comments, commentsLoading, selectedCheckNum, onSelectCheck, commentText, onCommentChange, onSubmit, submitting }: {
+  checks: ApiCheck[]; comments: ApiComment[]; commentsLoading: boolean;
+  selectedCheckNum: number | null; onSelectCheck: (n: number | null) => void;
+  commentText: string; onCommentChange: (t: string) => void; onSubmit: () => void; submitting: boolean;
+}) {
+  const selectedCheck = checks.find(c => c.check_number === selectedCheckNum) ?? null;
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 mt-8 mb-8">
+      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+        <MessageSquare size={14} /> Comments
+      </h4>
+
+      <div className="mb-4">
+        <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Checklist Item</label>
+        <select
+          value={selectedCheckNum ?? ''}
+          onChange={e => onSelectCheck(e.target.value ? Number(e.target.value) : null)}
+          className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20"
+        >
+          <option value="">— Select a checklist item to view or add comments —</option>
+          {checks.map(c => <option key={c.check_number} value={c.check_number}>{c.check_name}</option>)}
+        </select>
+      </div>
+
+      {selectedCheckNum !== null && (
+        <>
+          <div className="mb-4 space-y-3 min-h-[40px]">
+            {commentsLoading && <p className="text-xs text-slate-400 italic">Loading…</p>}
+            {!commentsLoading && comments.length === 0 && (
+              <p className="text-xs text-slate-400 italic">No comments yet for &ldquo;{selectedCheck?.check_name}&rdquo;.</p>
+            )}
+            {!commentsLoading && comments.map(c => (
+              <div key={c.id} className="flex gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                <div className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center shrink-0">
+                  <User size={12} className="text-slate-500" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-[10px] font-bold text-slate-700">{c.commented_by}</span>
+                    <span className="text-[9px] text-slate-400">{new Date(c.commented_at).toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-slate-600">{c.comment_text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            <textarea
+              value={commentText}
+              onChange={e => onCommentChange(e.target.value)}
+              placeholder={`Add a comment on "${selectedCheck?.check_name}"…`}
+              disabled={submitting}
+              rows={3}
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none disabled:opacity-50"
+            />
+            <button
+              onClick={onSubmit}
+              disabled={!commentText.trim() || submitting}
+              className="self-end bg-slate-900 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+            >
+              <Send size={12} /> Submit
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -1575,18 +1732,40 @@ function Dashboard({ onNavigateToAlerts }: { onNavigateToAlerts: () => void }) {
     }]
   };
 
+  const manualResolutionData = {
+    labels: [
+      'Vendor Wrong Billing',
+      'Wrong Rate Filing in LMS',
+      'Rate Billed Without HQ Approval',
+      'Reporting Error / Data Entry Error',
+      'Agreement / Rate Not in LMS',
+      'LMS & Process Exceptions',
+    ],
+    datasets: [{
+      label: 'Manual Resolutions',
+      data: [42, 31, 27, 22, 18, 16],
+      backgroundColor: ['#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444', '#22c55e', '#64748b'],
+      borderRadius: 4,
+    }]
+  };
+
   return (
     <div className="flex h-full bg-slate-50 overflow-hidden">
       {/* Main Dashboard Content */}
       <div className="flex-1 overflow-y-auto p-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-slate-900">Audit Dashboard — March 2026 | FY2026 Q1</h2>
-          <p className="text-slate-500 mt-1">Regional performance and audit health metrics.</p>
+        <div className="mb-8 flex justify-between items-start">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900">Audit Dashboard — March 2026 | FY2026 Q1</h2>
+            <p className="text-slate-500 mt-1">Regional performance and audit health metrics.</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold px-3 py-2 rounded-lg max-w-xs text-right">
+            Illustrative design only — final dashboard will be defined during the Solution Design phase.
+          </div>
         </div>
 
         {/* KPI Cards */}
         <div className="grid grid-cols-4 gap-6 mb-8">
-          <KPICard label="Total Invoices Audited" value="142" icon={<ClipboardList className="text-blue-500" />} />
+          <KPICard label="% of Invoices Audited" value="99.37%" icon={<ClipboardList className="text-blue-500" />} />
           <KPICard label="Amount Cleared" value="$1.24M" icon={<CheckCircle2 className="text-green-500" />} />
           <KPICard label="Amount in Contention" value="$318,000" icon={<AlertTriangle className="text-red-500" />} />
           <KPICard label="Avg. Resolution Time" value="6.2 days" icon={<LayoutDashboard className="text-amber-500" />} />
@@ -1597,14 +1776,65 @@ function Dashboard({ onNavigateToAlerts }: { onNavigateToAlerts: () => void }) {
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h4 className="text-sm font-bold text-slate-700 mb-6">Audit Status Distribution</h4>
             <div className="h-[250px] flex justify-center">
-              <Doughnut data={donutData} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }} />
+              <Doughnut data={donutData} options={{
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { position: 'right' },
+                  datalabels: {
+                    color: '#fff',
+                    font: { weight: 'bold' as const, size: 12 },
+                    formatter: (value: number, ctx: any) => {
+                      const sum = (ctx.chart.data.datasets[0].data as number[]).reduce((a: number, b: number) => a + b, 0);
+                      return Math.round((value / sum) * 100) + '%';
+                    }
+                  }
+                }
+              }} />
             </div>
           </div>
           <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
             <h4 className="text-sm font-bold text-slate-700 mb-6">Amount in Contention by Region</h4>
             <div className="h-[250px]">
-              <Bar data={barData} options={{ maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+              <Bar data={barData} options={{
+                maintainAspectRatio: false,
+                layout: { padding: { top: 24 } },
+                plugins: {
+                  legend: { display: false },
+                  datalabels: {
+                    anchor: 'end' as const,
+                    align: 'end' as const,
+                    color: '#475569',
+                    font: { size: 10, weight: 'bold' as const },
+                    formatter: (value: number) => '$' + (value / 1000).toFixed(1) + 'K'
+                  }
+                }
+              }} />
             </div>
+          </div>
+        </div>
+
+        {/* Manual Resolution by Category */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
+          <h4 className="text-sm font-bold text-slate-700 mb-6">Manual Resolutions by Category</h4>
+          <div className="h-[260px]">
+            <Bar
+              data={manualResolutionData}
+              options={{
+                indexAxis: 'y' as const,
+                maintainAspectRatio: false,
+                layout: { padding: { right: 40 } },
+                plugins: {
+                  legend: { display: false },
+                  datalabels: {
+                    anchor: 'end' as const,
+                    align: 'end' as const,
+                    color: '#475569',
+                    font: { size: 11, weight: 'bold' as const },
+                  }
+                },
+                scales: { x: { beginAtZero: true, ticks: { stepSize: 5 } } }
+              }}
+            />
           </div>
         </div>
 
@@ -1738,7 +1968,7 @@ function ArtefactsView() {
     { 
       title: "PIL Invoices", 
       thumbnail: "https://picsum.photos/seed/analytics/800/500",
-      description: "Comprehensive view of all Pacific Lines invoices with audit status trends and regional performance metrics."
+      description: "Comprehensive view of all Shipping Lines invoices with audit status trends and regional performance metrics."
     },
     { 
       title: "Invoice breakdown", 
@@ -3187,7 +3417,7 @@ function FindingSidePanel({ finding, onClose, resolutionType, setResolutionType,
                     </div>
                     <div>
                       <label className={`block text-[10px] font-bold text-${colorClass}-400 uppercase mb-1`}>CC</label>
-                      <input type="text" defaultValue="audit.india@pacificlines.com" className={`w-full bg-white border border-${colorClass}-200 rounded px-3 py-1.5 text-xs focus:outline-none`} />
+                      <input type="text" defaultValue="audit.india@shippinglines.com" className={`w-full bg-white border border-${colorClass}-200 rounded px-3 py-1.5 text-xs focus:outline-none`} />
                     </div>
                     <div>
                       <label className={`block text-[10px] font-bold text-${colorClass}-400 uppercase mb-1`}>Body</label>

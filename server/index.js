@@ -10,6 +10,7 @@ const auditRouter    = require('./routes/audit');
 const resolveRouter  = require('./routes/resolve');
 const alertsRouter   = require('./routes/alerts');
 const configRouter   = require('./routes/config');
+const commentsRouter = require('./routes/comments');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -24,6 +25,7 @@ app.use('/api/resolve',  resolveRouter);
 app.use('/api/email',    resolveRouter);
 app.use('/api/alerts',   alertsRouter);
 app.use('/api/config',   configRouter);
+app.use('/api/comments', commentsRouter);
 
 // Stats — top-level so frontend can call /api/stats
 app.get('/api/stats', (_, res) => {
