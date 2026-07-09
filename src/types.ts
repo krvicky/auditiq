@@ -37,7 +37,16 @@ export interface Invoice {
   auditTotal?: number;
 }
 
-export type Screen = 'queue' | 'case' | 'dashboard' | 'alerts' | 'config' | 'artefacts' | 'logs';
+export const ROUTES = {
+  dashboard: '/dashboard',
+  queue: '/queue',
+  case: '/case',
+  caseWithSerial: (rowSerial: string) => `/case/${rowSerial}`,
+  alerts: '/alerts',
+  config: '/config',
+  artefacts: '/artefacts',
+  logs: '/logs',
+} as const;
 
 // --- API response types ---
 

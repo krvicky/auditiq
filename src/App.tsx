@@ -45,6 +45,7 @@ import {
   Paperclip
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Routes, Route, Navigate, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   Chart as ChartJS,
   ArcElement,
@@ -57,7 +58,7 @@ import {
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { Doughnut, Bar } from 'react-chartjs-2';
-import { Invoice, Screen, ApiInvoice, ApiInvoiceDetail, ApiCheck, ApiStats, ApiAlertsResponse, ApiAlertCard, ApiComment } from './types';
+import { Invoice, ROUTES, ApiInvoice, ApiInvoiceDetail, ApiCheck, ApiStats, ApiAlertsResponse, ApiAlertCard, ApiComment } from './types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -301,35 +302,19 @@ const INVOICES: Invoice[] = [
   })
 ];
 
+function CaseViewRoute() {
+  const { rowSerial } = useParams<{ rowSerial: string }>();
+  const navigate = useNavigate();
+  return <CaseView rowSerial={rowSerial ?? ''} onBack={() => navigate(ROUTES.queue)} />;
+}
+
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('queue');
-  const [selectedRowSerial, setSelectedRowSerial] = useState<string>('');
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const navigateToCase = useCallback((rowSerial: string) => {
-    setSelectedRowSerial(rowSerial);
-    setCurrentScreen('case');
-  }, []);
-
-  const renderScreen = () => {
-    switch (currentScreen) {
-      case 'dashboard':
-        return <Dashboard onNavigateToAlerts={() => setCurrentScreen('alerts')} />;
-      case 'queue':
-        return <InvoiceQueue onSelectInvoice={navigateToCase} />;
-      case 'case':
-        return <CaseView rowSerial={selectedRowSerial} onBack={() => setCurrentScreen('queue')} />;
-      case 'alerts':
-        return <AlertsEscalation onNavigateToCase={navigateToCase} />;
-      case 'config':
-        return <AuditConfiguration />;
-      case 'artefacts':
-        return <ArtefactsView />;
-      case 'logs':
-        return <LogsView />;
-      default:
-        return <Dashboard onNavigateToAlerts={() => setCurrentScreen('alerts')} />;
-    }
-  };
+    navigate(ROUTES.caseWithSerial(rowSerial));
+  }, [navigate]);
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
@@ -346,47 +331,47 @@ export default function App() {
         </div>
 
         <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto">
-          <SidebarItem 
-            icon={<LayoutDashboard size={20} />} 
-            label="Dashboard" 
-            active={currentScreen === 'dashboard'} 
-            onClick={() => setCurrentScreen('dashboard')} 
+          <SidebarItem
+            icon={<LayoutDashboard size={20} />}
+            label="Dashboard"
+            to={ROUTES.dashboard}
+            active={location.pathname.startsWith(ROUTES.dashboard)}
           />
-          <SidebarItem 
-            icon={<ClipboardList size={20} />} 
-            label="Invoice Queue" 
-            active={currentScreen === 'queue'} 
-            onClick={() => setCurrentScreen('queue')} 
+          <SidebarItem
+            icon={<ClipboardList size={20} />}
+            label="Invoice Queue"
+            to={ROUTES.queue}
+            active={location.pathname.startsWith(ROUTES.queue)}
           />
-          <SidebarItem 
-            icon={<Search size={20} />} 
-            label="Case View" 
-            active={currentScreen === 'case'} 
-            onClick={() => setCurrentScreen('case')} 
+          <SidebarItem
+            icon={<Search size={20} />}
+            label="Case View"
+            to={ROUTES.case}
+            active={location.pathname.startsWith(ROUTES.case)}
           />
-          <SidebarItem 
-            icon={<Mail size={20} />} 
-            label="Alerts & Escalation" 
-            active={currentScreen === 'alerts'} 
-            onClick={() => setCurrentScreen('alerts')} 
+          <SidebarItem
+            icon={<Mail size={20} />}
+            label="Alerts & Escalation"
+            to={ROUTES.alerts}
+            active={location.pathname.startsWith(ROUTES.alerts)}
           />
-          <SidebarItem 
-            icon={<Settings size={20} />} 
-            label="Audit Configuration" 
-            active={currentScreen === 'config'} 
-            onClick={() => setCurrentScreen('config')} 
+          <SidebarItem
+            icon={<Settings size={20} />}
+            label="Audit Configuration"
+            to={ROUTES.config}
+            active={location.pathname.startsWith(ROUTES.config)}
           />
-          <SidebarItem 
-            icon={<Archive size={20} />} 
-            label="Artefacts" 
-            active={currentScreen === 'artefacts'} 
-            onClick={() => setCurrentScreen('artefacts')} 
+          <SidebarItem
+            icon={<Archive size={20} />}
+            label="Artefacts"
+            to={ROUTES.artefacts}
+            active={location.pathname.startsWith(ROUTES.artefacts)}
           />
-          <SidebarItem 
-            icon={<Terminal size={20} />} 
-            label="Logs" 
-            active={currentScreen === 'logs'} 
-            onClick={() => setCurrentScreen('logs')} 
+          <SidebarItem
+            icon={<Terminal size={20} />}
+            label="Logs"
+            to={ROUTES.logs}
+            active={location.pathname.startsWith(ROUTES.logs)}
           />
         </nav>
 
@@ -405,14 +390,24 @@ export default function App() {
       <main className="flex-1 overflow-y-auto relative">
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentScreen}
+            key={location.pathname}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
             className="h-full"
           >
-            {renderScreen()}
+            <Routes>
+              <Route path="/" element={<Navigate to={ROUTES.queue} replace />} />
+              <Route path={ROUTES.dashboard} element={<Dashboard onNavigateToAlerts={() => navigate(ROUTES.alerts)} />} />
+              <Route path={ROUTES.queue} element={<InvoiceQueue onSelectInvoice={navigateToCase} />} />
+              <Route path="/case/:rowSerial?" element={<CaseViewRoute />} />
+              <Route path={ROUTES.alerts} element={<AlertsEscalation onNavigateToCase={navigateToCase} />} />
+              <Route path={ROUTES.config} element={<AuditConfiguration />} />
+              <Route path={ROUTES.artefacts} element={<ArtefactsView />} />
+              <Route path={ROUTES.logs} element={<LogsView />} />
+              <Route path="*" element={<Navigate to={ROUTES.queue} replace />} />
+            </Routes>
           </motion.div>
         </AnimatePresence>
       </main>
@@ -420,19 +415,19 @@ export default function App() {
   );
 }
 
-function SidebarItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
+function SidebarItem({ icon, label, to, active }: { icon: React.ReactNode, label: string, to: string, active: boolean }) {
   return (
-    <button
-      onClick={onClick}
+    <Link
+      to={to}
       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-        active 
-          ? 'bg-amber-500 text-navy-900 shadow-lg shadow-amber-500/20' 
+        active
+          ? 'bg-amber-500 text-navy-900 shadow-lg shadow-amber-500/20'
           : 'text-slate-400 hover:text-white hover:bg-slate-800'
       }`}
     >
       {icon}
       <span>{label}</span>
-    </button>
+    </Link>
   );
 }
 
